@@ -16,8 +16,8 @@ import (
 var Client *http.Client = &http.Client{}
 
 func main() {
-	var laddr = flag.String("l", "127.0.33.1:8080", "listen address")
-	var saddr = flag.String("d", "127.0.0.1:5500", "server address")
+	var laddr = flag.String("l", "0.0.0.0:5000", "listen address")
+	var saddr = flag.String("d", "127.0.0.1:3000", "server address")
 	flag.Parse()
 
 	http.HandleFunc("/", getProxyFunc(*saddr))
@@ -34,7 +34,7 @@ func getProxyFunc(dst string) http.HandlerFunc {
 		newUrl.Host = dst
 		newUrl.Scheme = "http"
 
-		log.Println(newUrl.String(), r.Method)
+		log.Println(r.Method, newUrl.String())
 
 		reqText, err := io.ReadAll(r.Body)
 		if err != nil {
