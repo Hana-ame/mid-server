@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 
 	"github.com/andybalholm/brotli"
 	"github.com/fatih/color"
@@ -18,16 +19,26 @@ var Client *http.Client = &http.Client{}
 func main() {
 	var laddr = flag.String("l", "0.0.0.0:5000", "listen address")
 	var saddr = flag.String("d", "127.0.0.1:3000", "server address")
+	var reExp = flag.String("r", "", "regex to match")
 	flag.Parse()
 
-	http.HandleFunc("/", getProxyFunc(*saddr))
+	http.HandleFunc("/", getProxyFunc(*saddr, *reExp))
 	err := http.ListenAndServe(*laddr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func getProxyFunc(dst string) http.HandlerFunc {
+func getProxyFunc(dst, reg string) http.HandlerFunc {
+
+	re, err := regexp.Compile(reg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// isMatch := func(s string) {
+	// 	return re.MatchString([]byte(s))
+	// }
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// get request info from client
 		newUrl := r.URL
@@ -42,8 +53,11 @@ func getProxyFunc(dst string) http.HandlerFunc {
 			return
 		}
 		// log
-		color.Yellow(fmt.Sprintln(r.Header))
-		color.Green(fmt.Sprintln(string(reqText)))
+		if re.MatchString(newUrl.String()) {
+			color.White(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+			color.Yellow(fmt.Sprintln(r.Header))
+			color.Green(fmt.Sprintln(string(reqText)))
+		}
 
 		req, err := http.NewRequest(r.Method, newUrl.String(), bytes.NewBuffer(reqText))
 		if err != nil {
@@ -76,8 +90,11 @@ func getProxyFunc(dst string) http.HandlerFunc {
 		}
 
 		// log
-		color.Yellow(fmt.Sprintln(resp.Header))
-		color.Green(fmt.Sprintln(string(respText)))
+		if re.MatchString(newUrl.String()) {
+			color.White("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			color.Yellow(fmt.Sprintln(resp.Header))
+			color.Green(fmt.Sprintln(string(respText)))
+		}
 
 		// return to request
 		w.Write(respText)
