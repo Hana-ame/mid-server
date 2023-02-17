@@ -17,9 +17,11 @@ import (
 var Client *http.Client = &http.Client{}
 
 func main() {
+	log.Println("Starting")
+
 	var laddr = flag.String("l", "0.0.0.0:5000", "listen address")
 	var saddr = flag.String("d", "127.0.0.1:3000", "server address")
-	var reExp = flag.String("r", "", "regex to match")
+	var reExp = flag.String("r", ".*", "regex to match")
 	flag.Parse()
 
 	http.HandleFunc("/", getProxyFunc(*saddr, *reExp))
@@ -54,7 +56,7 @@ func getProxyFunc(dst, reg string) http.HandlerFunc {
 		}
 		// log
 		if re.MatchString(newUrl.String()) {
-			color.White(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+			color.White("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			color.Yellow(fmt.Sprintln(r.Header))
 			color.Green(fmt.Sprintln(string(reqText)))
 		}
@@ -64,6 +66,16 @@ func getProxyFunc(dst, reg string) http.HandlerFunc {
 			log.Println(err)
 			return
 		}
+
+		// forgeted to add Header, how could i do it.
+		for k, v := range r.Header {
+			for _, vv := range v {
+				req.Header.Add(k, vv)
+			}
+		}
+
+		// req.Header.Set("X-Host", "n.tsukishima.top") // a temporary solution // not work
+		req.Host = "n.tsukishima.top"
 
 		// make request to server
 		resp, err := Client.Do(req)
@@ -91,7 +103,7 @@ func getProxyFunc(dst, reg string) http.HandlerFunc {
 
 		// log
 		if re.MatchString(newUrl.String()) {
-			color.White("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			color.White(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 			color.Yellow(fmt.Sprintln(resp.Header))
 			color.Green(fmt.Sprintln(string(respText)))
 		}
