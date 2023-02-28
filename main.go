@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -19,6 +20,14 @@ import (
 var Client *http.Client = &http.Client{}
 
 func main() {
+
+	log.Println("Starting")
+
+	var laddr = flag.String("l", "0.0.0.0:5000", "listen address")
+	var saddr = flag.String("d", "127.0.0.1:3000", "server address")
+	var reExp = flag.String("r", ".*", "regex to match")
+	flag.Parse()
+
 	app := fiber.New()
 
 	wsHandler := websocket.New(func(c *websocket.Conn) {
@@ -48,6 +57,8 @@ func main() {
 		}
 	})
 
+	proxyHandler := getProxyFunc(*saddr, *reExp)
+
 	app.Use("/", func(c *fiber.Ctx) error {
 		// IsWebSocketUpgrade returns true if the client
 		// requested upgrade to the WebSocket protocol.
@@ -58,12 +69,9 @@ func main() {
 		return c.Next()
 	})
 
-	app.All("/*", func(c *fiber.Ctx) error {
-		c.WriteString("...")
-		return nil
-	})
+	app.All("/*", proxyHandler)
 
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(*laddr))
 	// Access the websocket server: ws://localhost:3000/ws/123?v=1.0
 	// https://www.websocket.org/echo.html
 }
