@@ -1,11 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
+	"regexp"
 
+	"github.com/andybalholm/brotli"
+	"github.com/fatih/color"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
+
+var Client *http.Client = &http.Client{}
 
 func main() {
 	app := fiber.New()
@@ -37,17 +48,6 @@ func main() {
 		}
 	})
 
-	// the order is determined by the order of the sentences.
-	app.Use("/test/2", func(c *fiber.Ctx) error {
-		log.Println("test/2")
-		return c.Next()
-	})
-
-	app.Use("/test/", func(c *fiber.Ctx) error {
-		log.Println("test")
-		return c.Next()
-	})
-
 	app.Use("/", func(c *fiber.Ctx) error {
 		// IsWebSocketUpgrade returns true if the client
 		// requested upgrade to the WebSocket protocol.
@@ -66,4 +66,107 @@ func main() {
 	log.Fatal(app.Listen(":3000"))
 	// Access the websocket server: ws://localhost:3000/ws/123?v=1.0
 	// https://www.websocket.org/echo.html
+}
+
+func getProxyFunc(dst, reg string) func(c *fiber.Ctx) error {
+
+	re, err := regexp.Compile(reg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// isMatch := func(s string) {
+	// 	return re.MatchString([]byte(s))
+	// }
+
+	return func(c *fiber.Ctx) error {
+		// get request info from client
+		newUrl, err := url.Parse(c.BaseURL())
+		if err != nil {
+			return err
+		}
+		newUrl.Host = dst
+		newUrl.Scheme = "http"
+
+		log.Println(c.Method(), newUrl.String())
+
+		reqText := c.Body()
+
+		// log
+		if re.MatchString(newUrl.String()) {
+			color.White("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			color.Yellow(fmt.Sprintln(c.GetReqHeaders()))
+			color.Green(fmt.Sprintln(string(reqText)))
+		}
+
+		req, err := http.NewRequest(c.Method(), newUrl.String(), bytes.NewBuffer(reqText))
+		if err != nil {
+			return err
+		}
+
+		// forgeted to add Header, how could i do it.
+		for k, v := range c.GetReqHeaders() {
+			req.Header.Add(k, v)
+		}
+
+		// req.Header.Set("X-Host", "n.tsukishima.top") // a temporary solution // not work
+		req.Host = "n.tsukishima.top"
+
+		// make request to server
+		resp, err := Client.Do(req)
+		if err != nil {
+			return err
+		}
+
+		// send response to client
+		// write headers
+		for k, v := range resp.Header {
+			if k != "Content-Encoding" {
+				c.Set(k, v[0])
+			}
+		}
+		// plain
+		c.SendStatus(resp.StatusCode)
+
+		// get body
+		body := getPlainTextReader(resp.Body, resp.Header.Get("Content-Encoding"))
+		respText, err := io.ReadAll(body)
+		if err != nil {
+			return err
+		}
+
+		// log
+		if re.MatchString(newUrl.String()) {
+			color.White(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+			color.Yellow(fmt.Sprintln(resp.Header))
+			color.Green(fmt.Sprintln(string(respText)))
+		}
+
+		// return to request
+		_, err = c.Write(respText)
+
+		return err
+	}
+}
+
+func getPlainTextReader(body io.ReadCloser, encoding string) io.ReadCloser {
+	switch encoding {
+	case "gzip":
+		reader, err := gzip.NewReader(body)
+		if err != nil {
+			log.Println("error decoding gzip response", reader)
+			log.Println("will return raw body")
+			return body
+		}
+		return reader
+	case "br":
+		reader := brotli.NewReader(body)
+		if reader == nil {
+			log.Println("error decoding br response", reader)
+			log.Println("will return raw body")
+			return body
+		}
+		return io.NopCloser(reader)
+	default:
+		return body
+	}
 }
