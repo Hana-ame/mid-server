@@ -63,6 +63,7 @@ func main() {
 		// IsWebSocketUpgrade returns true if the client
 		// requested upgrade to the WebSocket protocol.
 		if websocket.IsWebSocketUpgrade(c) {
+			// log.Println("ws")
 			c.Locals("allowed", true)
 			return wsHandler(c)
 		}
@@ -87,6 +88,7 @@ func getProxyFunc(dst, reg string) func(c *fiber.Ctx) error {
 	// }
 
 	return func(c *fiber.Ctx) error {
+		// log.Println("http")
 		// get request info from client
 		newUrl, err := url.Parse(c.BaseURL())
 		if err != nil {
@@ -133,7 +135,7 @@ func getProxyFunc(dst, reg string) func(c *fiber.Ctx) error {
 			}
 		}
 		// plain
-		c.SendStatus(resp.StatusCode)
+		c.Status(resp.StatusCode)
 
 		// get body
 		body := getPlainTextReader(resp.Body, resp.Header.Get("Content-Encoding"))
