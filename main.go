@@ -90,7 +90,10 @@ func getProxyFunc(dst, reg string) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// log.Println("http")
 		// get request info from client
-		newUrl, err := url.Parse(c.BaseURL())
+		// log.Println(c.Request().URI().Host())
+		trueHost := c.Request().URI().Host()
+
+		newUrl, err := url.Parse(c.Request().URI().String())
 		if err != nil {
 			return err
 		}
@@ -120,6 +123,7 @@ func getProxyFunc(dst, reg string) func(c *fiber.Ctx) error {
 
 		// req.Header.Set("X-Host", "n.tsukishima.top") // a temporary solution // not work
 		req.Host = "n.tsukishima.top"
+		req.Host = string(trueHost)
 
 		// make request to server
 		resp, err := Client.Do(req)
